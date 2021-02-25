@@ -1,4 +1,3 @@
-
 <html>
     <head>
         <meta charset="UTF-8">
@@ -30,7 +29,8 @@
             faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js/weights/'),
             faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js/weights/'),
             faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js/weights/'),
-            faceapi.nets.ageGenderNet.loadFromUri('https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js/weights/')
+            faceapi.nets.ageGenderNet.loadFromUri('https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js/weights/'),
+            faceapi.nets.ssdMobilenetv1.loadFromUri('https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js/weights/')
           ]).then(startVideo)
 
           function startVideo() {
@@ -44,6 +44,8 @@
           video.addEventListener('play', async () => {
             const canvas = faceapi.createCanvasFromMedia(video)
             document.body.append(canvas)
+            const labeledFaceDescriptors = await loadLabeledImages()
+            const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6)
             const displaySize = {width: video.width, height: video.height}
             faceapi.matchDimensions(canvas, displaySize)
             setInterval(async () => {
@@ -64,14 +66,92 @@
                   result.detection.box.bottomRight
                 ).draw(canvas);
               });
-              resizedDetections.forEach(detection => {
-                const box = detection.detection.box
-                const drawBox = new faceapi.draw.DrawBox(box, {
-                  label: "😄 Radom BIU Person 😁"})
+              const results = resizedDetections.map(d => faceMatcher.findBestMatch(d.descriptor))
+              results.forEach((result, i) => {
+                const box = resizedDetections[i].detection.box
+                const drawBox = new faceapi.draw.DrawBox(box, { label: result.toString() })
                 drawBox.draw(canvas)
               })
+              // resizedDetections.forEach(detection => {
+              //   const box = detection.detection.box
+              //   const drawBox = new faceapi.draw.DrawBox(box, {
+              //     label: "😄 Radom BIU Person 😁"})
+              //   drawBox.draw(canvas)
+              // })
             },100)
           })
+          async function loadLabeledImages() {
+            
+            const images = {
+              'Lihour':['./photo/lihour.jpg', './photo/lihour1.jpg'],
+              'Heanh':['./photo/heanh.jpeg', './photo/heanh1.jpg'], 
+              'Liva':['./photo/liva.jpeg','./photo/liva1.jpg'],
+              'Heng':['./photo/heng.jpeg', './photo/heng1.jpg'],
+              'Panha':['./photo/panha.jpeg', './photo/panha1.jpg'], 
+              'Reaksmy':['./photo/reaksmey.jpg', './photo/reaksmey1.jpg'],
+              'Lyheng':['./photo/lyheng.jpg', './photo/lyheng1.jpg'],
+              'Vitou':['./photo/vitou.jpg', './photo/vitou1.jpeg'], 
+              'Virakbuth':['./photo/virakbuth.jpg', './photo/virakbuth1.jpg'],
+              'Balaj':['./photo/balaj.png'], 
+              'Smriti':['./photo/smriti.jpg'],
+              'Sanjay':['./photo/sanjay.jpeg', './photo/sanjay1.jpg'],
+              'Kunavath':['./photo/kunavath.jpg','./photo/kunavath1.jpg'],
+              'Vichea':['./photo/vichea.jpg','./photo/vichea1.jpg'],
+              'Thyda':['./photo/thyda.jpg','./photo/thyda1.jpg']
+            }
+            labels = []
+
+            for (var key in images) {
+              for(const link of images[key]) {
+                labels.push({
+                  'name': key,
+                  'img': link
+                })
+              }
+            }
+
+            
+
+            const labeledFaceDescriptors = await Promise.all(
+              labels.map(async (label, index) => {
+                // fetch image data from urls and convert blob to HTMLImage element
+                // const imgUrl = label
+
+                console.log(label['name'], label['img'])
+
+                const img = await faceapi.fetchImage(label['img'])
+                
+                // detect the face with the highest score in the image and compute it's landmarks and face descriptor
+                const fullFaceDescription = await faceapi.detectSingleFace(img)
+                                              .withFaceLandmarks().withFaceDescriptor()
+                
+                if (!fullFaceDescription) {
+                  throw new Error(`no faces detected for ${label['name']}`)
+                }
+                
+                const faceDescriptors = [fullFaceDescription.descriptor]
+                return new faceapi.LabeledFaceDescriptors(label['name'], faceDescriptors)
+              })
+            )
+            
+            return labeledFaceDescriptors
+
+            // return Promise.all(
+            //   labels.map(async label => {
+            //     const descriptions = []
+            //     for (let i = 0; i < 2; i++) {
+            //       const img = await faceapi.fetchImage(images[i])
+            //       console.log(labels[i])
+            //       console.log(images[i])
+            //       const detections = await faceapi.detectSingleFace(img)
+            //                               .withFaceLandmarks().withFaceDescriptor()
+            //       descriptions.push(detections.descriptor)
+            //     }
+
+            //     return new faceapi.LabeledFaceDescriptors(label, descriptions)
+            //   })
+            // )
+          }
         </script>
     </body>
 </html>
